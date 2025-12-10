@@ -2,8 +2,9 @@ name: Shuffle Radiology DB
 
 on:
   schedule:
-    # 毎日 05:00 JST（20:00 UTC）に実行
-    - cron: "0 20 * * *"
+    # 10分ごとに実行（UTC基準だが、JSTでも10分おきに動くイメージでOK）
+    - cron: "*/10 * * * *"
+  # 手動実行もできるようにしておく
   workflow_dispatch: {}
 
 jobs:
@@ -11,18 +12,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      # リポジトリの中身をチェックアウト
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      # Node.js をセットアップ
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Install Notion SDK
-        run: npm install @notionhq/client
+      # （必要なら）依存パッケージを入れる
+      # 今の shuffle-radiology-db.js は Node.js の標準 fetch を使っているので、
+      # ここでは何もインストールしていません。
+      # もし今後何か npm パッケージを使うなら、このステップで追加します。
+      - name: Install dependencies
+        run: |
+          echo "No additional dependencies"
 
-      - name: Shuffle Radiology DB
+      # スクリプトを実行
+      - name: Run shuffle script
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           RADIOLOGY_DB_ID: ${{ secrets.RADIOLOGY_DB_ID }}
