@@ -1,5 +1,5 @@
 // shuffle-radiology-db.js
-// 毎日ランダムに 11 症例だけ Today Review = true にするスクリプト
+// 毎日ランダムに 11 症例だけ TodayReview = true にするスクリプト
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
 const DATABASE_ID = process.env.RADIOLOGY_DB_ID;
@@ -15,38 +15,37 @@ if (!DATABASE_ID) {
   throw new Error("RADIOLOGY_DB_ID が設定されていません。GitHub Secrets を確認してください。");
 }
 
-// 共通ヘッダ
 function notionHeaders() {
   return {
-    "Authorization": `Bearer ${NOTION_TOKEN}`,
+    Authorization: `Bearer ${NOTION_TOKEN}`,
     "Notion-Version": NOTION_VERSION,
     "Content-Type": "application/json",
   };
 }
 
-// データベースから全ページ取得（ページネーション対応）
 async function fetchAllPages(databaseId) {
   const pages = [];
   let hasMore = true;
   let cursor = null;
 
   while (hasMore) {
-    const body = {
-      page_size: 100,
-    };
-    if (cursor) {
-      body.start_cursor = cursor;
-    }
+    const body = { page_size: 100 };
+    if (cursor) body.start_cursor = cursor;
 
-    const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
-      method: "POST",
-      headers: notionHeaders(),
-      body: JSON.stringify(body),
-    });
+    const res = await fetch(
+      `https://api.notion.com/v1/databases/${databaseId}/query`,
+      {
+        method: "POST",
+        headers: notionHeaders(),
+        body: JSON.stringify(body),
+      }
+    );
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Database query failed: ${res.status} ${res.statusText} - ${text}`);
+      throw new Error(
+        `Database query failed: ${res.status} ${res.statusText} - ${text}`
+      );
     }
 
     const data = await res.json();
@@ -58,15 +57,12 @@ async function fetchAllPages(databaseId) {
   return pages;
 }
 
-// Today Review と Random を更新
 async function updatePageReview(pageId, isTodayReview) {
   const body = {
     properties: {
-      // チェックボックス Today Review
-      "Today Review": {
+      TodayReview: {
         checkbox: isTodayReview,
       },
-      // ついでに Random も更新（任意）
       Random: {
         number: Math.random(),
       },
@@ -81,11 +77,13 @@ async function updatePageReview(pageId, isTodayReview) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Update page failed (${pageId}): ${res.status} ${res.statusText} - ${text}`);
+    throw new Error(
+      `Update page failed (${pageId}): ${res.status} ${res.statusText} - ${text}`
+    );
   }
 }
 
-// 配列をインプレースでシャッフル（Fisher–Yates）
+// Fisher–Yatesシャッフル
 function shuffleArray(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -104,28 +102,25 @@ async function main() {
     return;
   }
 
-  // ランダムシャッフル
   shuffleArray(pages);
 
-  // 先頭 DAILY_REVIEW_COUNT 件を今日の復習対象に
   const selectedCount = Math.min(DAILY_REVIEW_COUNT, pages.length);
   const selectedIds = new Set(
     pages.slice(0, selectedCount).map((page) => page.id)
   );
 
-  console.log(`Selecting ${selectedCount} pages for Today Review.`);
+  console.log(`Selecting ${selectedCount} pages for TodayReview.`);
 
-  // 全ページに対して Today Review を更新
   for (const page of pages) {
     const pageId = page.id;
     const isTodayReview = selectedIds.has(pageId);
     await updatePageReview(pageId, isTodayReview);
     console.log(
-      `Updated ${pageId} -> Today Review: ${isTodayReview ? "true" : "false"}`
+      `Updated ${pageId} -> TodayReview: ${isTodayReview ? "true" : "false"}`
     );
   }
 
-  console.log("Done: Today Review pages updated.");
+  console.log("Done: TodayReview pages updated.");
 }
 
 main().catch((err) => {
