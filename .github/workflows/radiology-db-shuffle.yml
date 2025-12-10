@@ -1,0 +1,25 @@
+name: Radiology DB Shuffle
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  shuffle:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run shuffle script
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          RADIOLOGY_DB_ID: ${{ secrets.RADIOLOGY_DB_ID }}
+        run: node shuffle-radiology-db.js
