@@ -1,29 +1,58 @@
-name: Shuffle Radiology DB
+// shuffle-radiology-db.js
+const { Client } = require("@notionhq/client");
 
-on:
-  schedule:
-    # 毎日 05:00 JST（20:00 UTC）に実行
-    - cron: "0 20 * * *"
-  workflow_dispatch: {}
+const notion = new Client({ auth: process.env.NOTION_TOKEN });
+const DATABASE_ID = process.env.RADIOLOGY_DB_ID;
 
-jobs:
-  shuffle:
-    runs-on: ubuntu-latest
+async function fetchAllPages(databaseId) {
+  const pages = [];
+  let cursor = undefined;
 
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+  while (true) {
+    const response = await notion.databases.query({
+      database_id: databaseId,
+      start_cursor: cursor,
+      page_size: 100,
+    });
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+    pages.push(...response.results);
 
-      - name: Install Notion SDK
-        run: npm install @notionhq/client
+    if (!response.has_more) break;
+    cursor = response.next_cursor;
+  }
 
-      - name: Shuffle Radiology DB
-        env:
-          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          RADIOLOGY_DB_ID: ${{ secrets.RADIOLOGY_DB_ID }}
-        run: node shuffle-radiology-db.js
+  return pages;
+}
+
+async function shuffleRadiologyDb() {
+  if (!DATABASE_ID) {
+    throw new Error("RADIOLOGY_DB_ID が設定されていません。");
+  }
+
+  console.log("Fetching pages from Radiology DB...");
+  const pages = await fetchAllPages(DATABASE_ID);
+  console.log(`Total pages: ${pages.length}`);
+
+  for (const page of pages) {
+    const pageId = page.id;
+    const randomValue = Math.random(); // 0〜1 の乱数
+
+    await notion.pages.update({
+      page_id: pageId,
+      properties: {
+        Random: {
+          number: randomValue,
+        },
+      },
+    });
+
+    console.log(`Updated page ${pageId} -> Random: ${randomValue}`);
+  }
+
+  console.log("Done: Radiology DB shuffled.");
+}
+
+shuffleRadiologyDb().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
