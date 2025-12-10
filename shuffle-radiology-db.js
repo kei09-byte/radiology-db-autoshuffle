@@ -1,9 +1,12 @@
 // shuffle-radiology-db.js
-// Notion SDK を使わず、Node.js の fetch で直接 Notion API を叩くバージョン
+// 毎日ランダムに 11 症例だけ Today Review = true にするスクリプト
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
 const DATABASE_ID = process.env.RADIOLOGY_DB_ID;
-const NOTION_VERSION = "2022-06-28"; // 安定版のバージョン
+const NOTION_VERSION = "2022-06-28"; // Notion APIの安定版
+
+// 毎日抽出する症例数
+const DAILY_REVIEW_COUNT = 11;
 
 if (!NOTION_TOKEN) {
   throw new Error("NOTION_TOKEN が設定されていません。GitHub Secrets を確認してください。");
@@ -21,7 +24,7 @@ function notionHeaders() {
   };
 }
 
-// データベースから全ページを取得（ページネーション対応）
+// データベースから全ページ取得（ページネーション対応）
 async function fetchAllPages(databaseId) {
   const pages = [];
   let hasMore = true;
@@ -55,12 +58,17 @@ async function fetchAllPages(databaseId) {
   return pages;
 }
 
-// 各ページの Random プロパティを更新
-async function updatePageRandom(pageId, value) {
+// Today Review と Random を更新
+async function updatePageReview(pageId, isTodayReview) {
   const body = {
     properties: {
+      // チェックボックス Today Review
+      "Today Review": {
+        checkbox: isTodayReview,
+      },
+      // ついでに Random も更新（任意）
       Random: {
-        number: value,
+        number: Math.random(),
       },
     },
   };
@@ -77,21 +85,47 @@ async function updatePageRandom(pageId, value) {
   }
 }
 
+// 配列をインプレースでシャッフル（Fisher–Yates）
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
 async function main() {
   console.log("Fetching pages from Radiology DB...");
 
   const pages = await fetchAllPages(DATABASE_ID);
   console.log(`Total pages: ${pages.length}`);
 
-  for (const page of pages) {
-    const pageId = page.id;
-    const randomValue = Math.random(); // 0〜1 の乱数
-
-    await updatePageRandom(pageId, randomValue);
-    console.log(`Updated ${pageId} -> Random: ${randomValue}`);
+  if (pages.length === 0) {
+    console.log("No pages found. Exiting.");
+    return;
   }
 
-  console.log("Done: Radiology DB shuffled.");
+  // ランダムシャッフル
+  shuffleArray(pages);
+
+  // 先頭 DAILY_REVIEW_COUNT 件を今日の復習対象に
+  const selectedCount = Math.min(DAILY_REVIEW_COUNT, pages.length);
+  const selectedIds = new Set(
+    pages.slice(0, selectedCount).map((page) => page.id)
+  );
+
+  console.log(`Selecting ${selectedCount} pages for Today Review.`);
+
+  // 全ページに対して Today Review を更新
+  for (const page of pages) {
+    const pageId = page.id;
+    const isTodayReview = selectedIds.has(pageId);
+    await updatePageReview(pageId, isTodayReview);
+    console.log(
+      `Updated ${pageId} -> Today Review: ${isTodayReview ? "true" : "false"}`
+    );
+  }
+
+  console.log("Done: Today Review pages updated.");
 }
 
 main().catch((err) => {
