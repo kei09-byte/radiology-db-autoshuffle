@@ -6,7 +6,7 @@ const DATABASE_ID = process.env.RADIOLOGY_DB_ID;
 const NOTION_VERSION = "2022-06-28"; // Notion APIの安定版
 
 // 毎日抽出する症例数
-const DAILY_REVIEW_COUNT = 12;
+const DAILY_REVIEW_COUNT = 9;
 
 if (!NOTION_TOKEN) {
   throw new Error("NOTION_TOKEN が設定されていません。GitHub Secrets を確認してください。");
